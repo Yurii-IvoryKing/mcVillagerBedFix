@@ -49,10 +49,15 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
 
                 Optional<Block> nearestBed = findNearestBed(villagerLocation);
 
-                if (nearestBed.isPresent() && !isBedOccupied(nearestBed.get()) && !isVillagerSleeping(villager)) {
-                    teleportVillagerToBed(villager, nearestBed.get());
-                    teleportedVillagers.add(villager); // Add the villager to the set of those who have already gone to
-                                                       // bed
+                if (nearestBed.isPresent()) {
+                    Block bedBlock = nearestBed.get();
+                    // Only teleport the villager if the bed is not occupied and the villager is not
+                    // already sleeping
+                    if (!isBedOccupied(bedBlock) && !isVillagerSleeping(villager)) {
+                        teleportVillagerToBed(villager, bedBlock);
+                        teleportedVillagers.add(villager); // Add the villager to the set of those who have already gone
+                                                           // to bed
+                    }
                 }
             }
         }
@@ -83,26 +88,25 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
 
         Optional<Block> nearestBed = findNearestBed(villagerLocation);
 
-        if (nearestBed.isPresent() && !isBedMaterial(nearestBed.get())) {
-            return; // The bed was destroyed or changed
+        if (nearestBed.isEmpty()) {
+            return; // No bed found, don't teleport
         }
 
+        Block bedBlock = nearestBed.get();
         // Check if the bed is occupied
-        if (isBedOccupied(nearestBed.get())) {
+        if (isBedOccupied(bedBlock)) {
             return; // The bed is occupied, don't teleport
         }
 
         // If the villager is already near the bed, do nothing
-        if (nearestBed.isPresent() && villagerLocation.distanceSquared(nearestBed.get().getLocation()) < 2) {
+        if (villagerLocation.distanceSquared(bedBlock.getLocation()) < 2) {
             return; // The villager is already near the bed, do nothing
         }
 
         // Teleport the villager to the bed
-        nearestBed.ifPresent(bedBlock -> {
-            Location bedLocation = bedBlock.getLocation().add(0.5, 0.5, 0.5);
-            villager.teleport(bedLocation);
-            // No logging here
-        });
+        Location bedLocation = bedBlock.getLocation().add(0.5, 0.5, 0.5);
+        villager.teleport(bedLocation);
+        // No logging here
     }
 
     private Optional<Block> findNearestBed(Location location) {
