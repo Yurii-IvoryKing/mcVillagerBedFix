@@ -93,13 +93,23 @@ public class VillagerBedFix extends JavaPlugin {
             for (int y = -radius; y <= radius; y++) {
                 for (int z = -radius; z <= radius; z++) {
                     Block block = world.getBlockAt(location.clone().add(x, y, z));
-                    if (block.getType() == Material.BED && isBedUsable(block)) {
+                    if (isBedBlock(block) && isBedUsable(block)) {
                         return block;
                     }
                 }
             }
         }
         return null;
+    }
+
+    private boolean isBedBlock(Block block) {
+        Material type = block.getType();
+        return type == Material.WHITE_BED || type == Material.ORANGE_BED || type == Material.MAGENTA_BED ||
+                type == Material.LIGHT_BLUE_BED || type == Material.YELLOW_BED || type == Material.LIME_BED ||
+                type == Material.PINK_BED || type == Material.GRAY_BED || type == Material.LIGHT_GRAY_BED ||
+                type == Material.CYAN_BED || type == Material.PURPLE_BED || type == Material.BLUE_BED ||
+                type == Material.BROWN_BED || type == Material.GREEN_BED || type == Material.RED_BED ||
+                type == Material.BLACK_BED;
     }
 
     private boolean isBedUsable(Block block) {
