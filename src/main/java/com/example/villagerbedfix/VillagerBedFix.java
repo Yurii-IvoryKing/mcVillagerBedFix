@@ -3,108 +3,123 @@ package com.example.villagerbedfix;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Bed;
-import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Villager;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import io.papermc.paper.event.entity.EntityMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;;
 
-public class VillagerBedFix extends JavaPlugin implements Listener {
+public class VillagerBedFix extends JavaPlugin {
 
-    private Set<Villager> teleportedVillagers = new HashSet<>(); // Track villagers that have already been teleported to
-                                                                 // a bed
-    private Map<Villager, Block> claimedBeds = new HashMap<>(); // Map to track each villager's claimed bed
-    private final long TELEPORT_INTERVAL = 100L; // Check every 5 seconds
+    private final Map<Villager, Long> lastTeleportTime = new HashMap<>();
+    private static final long TELEPORT_COOLDOWN = 5000; // 5 seconds in milliseconds
 
     @Override
     public void onEnable() {
-        getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("VillagerBedFix enabled for Minecraft 1.21.4!");
-
-        // Check every 5 seconds
+        // Schedule the teleportation task to run periodically
         new BukkitRunnable() {
             @Override
             public void run() {
-                checkVillagersForBed();
+                for (World world : Bukkit.getWorlds()) {
+                    if (!isNight(world))
+                        continue; // Only process at night
+
+                    for (Entity entity : world.getEntitiesByClass(Villager.class)) {
+                        if (entity instanceof Villager villager) {
+                            tryTeleportToBed(villager);
+                        }
+                    }
+                }
             }
-        }.runTaskTimer(this, 0L, TELEPORT_INTERVAL); // Start checking after 0 ticks, repeat every 100 ticks (5 seconds)
+        }.runTaskTimer(this, 0, 20); // Runs every second (20 ticks)
     }
 
-    @Override
-    public void onDisable() {
-        getLogger().info("VillagerBedFix disabled!");
+    private boolean isNight(World world) {
+        long time = world.getTime();
+        return time >= 13000 && time <= 23000;
     }
 
-    private void checkVillagersForBed() {
-        for (Villager villager : Bukkit.getWorlds().get(0).getEntitiesByClass(Villager.class)) {
-            if (isNight() && !teleportedVillagers.contains(villager)) { // If it's night and the villager hasn't gone to
-                                                                        // bed
-                Block claimedBed = claimedBeds.get(villager); // Get the villager's claimed bed
+    private void tryTeleportToBed(Villager villager) {
+        // Ensure cooldown is respected
+        long currentTime = System.currentTimeMillis();
+        if (lastTeleportTime.containsKey(villager)
+                && currentTime - lastTeleportTime.get(villager) < TELEPORT_COOLDOWN) {
+            return;
+        }
 
-                if (claimedBed != null && !isVillagerSleeping(villager)) {
-                    teleportVillagerToBed(villager, claimedBed);
-                    teleportedVillagers.add(villager); // Add to the set of teleported villagers
+        // If the villager is already sleeping, skip
+        if (villager.isSleeping()) {
+            return;
+        }
+
+        // Check for the villager's claimed bed
+        Block bedBlock = getClaimedBed(villager);
+        if (bedBlock != null) {
+            if (isBedUsable(bedBlock)) {
+                teleportVillagerToBed(villager, bedBlock);
+                lastTeleportTime.put(villager, currentTime);
+                return;
+            }
+        }
+
+        // Look for an unclaimed bed nearby
+        Block unclaimedBed = findUnclaimedBedNearby(villager.getLocation());
+        if (unclaimedBed != null) {
+            teleportVillagerToBed(villager, unclaimedBed);
+            lastTeleportTime.put(villager, currentTime);
+        }
+    }
+
+    private Block getClaimedBed(Villager villager) {
+        // Placeholder logic to retrieve the villager's claimed bed
+        // Villager AI usually assigns a bed, but you can customize this if necessary
+        // Here, we'll assume no direct API and leave this unimplemented.
+        return null;
+    }
+
+    private Block findUnclaimedBedNearby(Location location) {
+        int radius = 5;
+        World world = location.getWorld();
+        if (world == null)
+            return null;
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -radius; y <= radius; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    Block block = world.getBlockAt(location.clone().add(x, y, z));
+                    if (block.getType() == Material.BED && isBedUsable(block)) {
+                        return block;
+                    }
                 }
             }
         }
+        return null;
     }
 
-    private boolean isVillagerSleeping(Villager villager) {
-        return villager.isSleeping(); // Check if the villager is sleeping
+    private boolean isBedUsable(Block block) {
+        if (!(block.getBlockData() instanceof Bed)) {
+            return false;
+        }
+
+        // Ensure no entities are already on the bed
+        Location bedLocation = block.getLocation();
+        for (Entity entity : bedLocation.getWorld().getNearbyEntities(bedLocation, 1, 1, 1)) {
+            if (entity instanceof LivingEntity livingEntity && livingEntity.isSleeping()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void teleportVillagerToBed(Villager villager, Block bedBlock) {
-        Location bedLocation = bedBlock.getLocation().add(0.5, 0.5, 0.5);
+        Location bedLocation = bedBlock.getLocation().add(0.5, 0.5, 0.5); // Center the villager on the bed
         villager.teleport(bedLocation);
-        // No logging here
-    }
-
-    @EventHandler
-    public void onVillagerMove(EntityMoveEvent event) {
-        if (event.getEntityType() != EntityType.VILLAGER)
-            return;
-
-        Villager villager = (Villager) event.getEntity();
-        Location villagerLocation = villager.getLocation();
-
-        // If it's daytime, do not teleport
-        if (!isNight()) {
-            return; // If it's daytime, don't teleport
-        }
-
-        Block claimedBed = claimedBeds.get(villager); // Get the villager's claimed bed
-
-        if (claimedBed == null) {
-            return; // If the villager hasn't claimed a bed, don't teleport
-        }
-
-        // Check if the villager is near their claimed bed
-        if (villagerLocation.distanceSquared(claimedBed.getLocation()) < 2) {
-            return; // The villager is already near their bed, do nothing
-        }
-
-        // Directly teleport the villager to the bed without checking for obstacles
-        teleportVillagerToBed(villager, claimedBed);
-    }
-
-    // Check if it's night in the game
-    private boolean isNight() {
-        long time = Bukkit.getWorlds().get(0).getTime();
-        return time >= 13000 && time <= 23000; // Night time in Minecraft (13000 - 23000)
-    }
-
-    // Add a method for villagers to claim a bed
-    public void claimBed(Villager villager, Block bedBlock) {
-        claimedBeds.put(villager, bedBlock); // Track the bed the villager has claimed
     }
 }
