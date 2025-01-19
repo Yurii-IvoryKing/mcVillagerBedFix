@@ -98,40 +98,8 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
             return; // The bed is occupied, don't teleport
         }
 
-        // Teleport the villager to their claimed bed
+        // Directly teleport the villager to the bed without checking for obstacles
         teleportVillagerToBed(villager, claimedBed);
-    }
-
-    private Optional<Block> findNearestBed(Location location) {
-        double radius = 5.0;
-        Block nearestBed = null;
-        double shortestDistance = radius * radius;
-
-        // Loop through a 5x5x5 area around the villager's location to find the nearest
-        // bed
-        for (int x = -5; x <= 5; x++) {
-            for (int y = -5; y <= 5; y++) {
-                for (int z = -5; z <= 5; z++) {
-                    Location checkLocation = location.clone().add(x, y, z);
-                    Block block = checkLocation.getBlock();
-
-                    // Check if the block is a bed of any color
-                    if (isBedMaterial(block)) {
-                        double distance = block.getLocation().distanceSquared(location);
-                        if (distance < shortestDistance) {
-                            nearestBed = block;
-                            shortestDistance = distance;
-                        }
-                    }
-                }
-            }
-        }
-        return Optional.ofNullable(nearestBed);
-    }
-
-    // Check if the block is a bed of any color
-    private boolean isBedMaterial(Block block) {
-        return block.getType().name().endsWith("_BED");
     }
 
     // Check if the bed is occupied
