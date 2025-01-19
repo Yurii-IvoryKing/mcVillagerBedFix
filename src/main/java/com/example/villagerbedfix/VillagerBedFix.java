@@ -51,7 +51,7 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
                                                                         // bed
                 Block claimedBed = claimedBeds.get(villager); // Get the villager's claimed bed
 
-                if (claimedBed != null && !isBedOccupied(claimedBed) && !isVillagerSleeping(villager)) {
+                if (claimedBed != null && !isVillagerSleeping(villager)) {
                     teleportVillagerToBed(villager, claimedBed);
                     teleportedVillagers.add(villager); // Add to the set of teleported villagers
                 }
@@ -93,26 +93,8 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
             return; // The villager is already near their bed, do nothing
         }
 
-        // If the bed is occupied, don't teleport the villager to it
-        if (isBedOccupied(claimedBed)) {
-            return; // The bed is occupied, don't teleport
-        }
-
         // Directly teleport the villager to the bed without checking for obstacles
         teleportVillagerToBed(villager, claimedBed);
-    }
-
-    // Check if the bed is occupied
-    private boolean isBedOccupied(Block bedBlock) {
-        if (bedBlock == null)
-            return false;
-
-        Bed bedData = (Bed) bedBlock.getBlockData();
-        return bedData.getPart() == Bed.Part.HEAD && bedBlock.getWorld().getEntities().stream()
-                .anyMatch(entity -> entity.getLocation().distanceSquared(bedBlock.getLocation()) < 2); // Check if there
-                                                                                                       // is a player or
-                                                                                                       // villager near
-                                                                                                       // the bed
     }
 
     // Check if it's night in the game
