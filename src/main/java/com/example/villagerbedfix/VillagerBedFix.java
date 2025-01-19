@@ -35,9 +35,20 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
         Villager villager = (Villager) event.getEntity();
         Location villagerLocation = villager.getLocation();
 
-        // Знаходимо найближче ліжко в радіусі 5 блоків
+        // Find the nearest usable bed in a 5-block radius
         Optional<Block> nearestBed = findNearestBed(villagerLocation);
 
+        // Якщо ліжко не знайдено або ліжко не є одним з підтримуваних кольорів
+        if (nearestBed.isPresent() && !isBedMaterial(nearestBed.get())) {
+            return; // Ліжко було знищене або змінено
+        }
+
+        // Якщо мешканець вже біля ліжка, не телепортуємо
+        if (nearestBed.isPresent() && villagerLocation.distanceSquared(nearestBed.get().getLocation()) < 2) {
+            return; // Мешканець вже біля ліжка, не робимо нічого
+        }
+
+        // Телепортуємо мешканця на ліжко
         nearestBed.ifPresent(bedBlock -> {
             Location bedLocation = bedBlock.getLocation().add(0.5, 0.5, 0.5);
             villager.teleport(bedLocation);
@@ -56,8 +67,8 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
                     Location checkLocation = location.clone().add(x, y, z);
                     Block block = checkLocation.getBlock();
 
-                    // Перевіряємо, чи є блок ліжком (незалежно від кольору)
-                    if (isBed(block)) {
+                    // Перевірка на ліжко будь-якого кольору
+                    if (isBedMaterial(block)) {
                         double distance = block.getLocation().distanceSquared(location);
                         if (distance < shortestDistance) {
                             nearestBed = block;
@@ -70,8 +81,8 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
         return Optional.ofNullable(nearestBed);
     }
 
-    // Метод для перевірки чи є блок ліжком
-    private boolean isBed(Block block) {
-        return block.getType().name().endsWith("_BED") && block.getBlockData() instanceof Bed;
+    // Перевірка на ліжко будь-якого кольору
+    private boolean isBedMaterial(Block block) {
+        return block.getType().name().endsWith("_BED");
     }
 }

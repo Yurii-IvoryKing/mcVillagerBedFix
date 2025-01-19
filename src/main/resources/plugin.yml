@@ -1,0 +1,9 @@
+name: VillagerBedFix
+version: 1.0
+main: com.example.villagerbedfix.VillagerBedFix
+api-version: 1.21
+description: A plugin that fixes villager pathfinding to beds.
+commands:
+  villagerbedfix:
+    description: Teleports villagers to their nearest bed.
+    usage: /<command>
