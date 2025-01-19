@@ -11,20 +11,61 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import io.papermc.paper.event.entity.EntityMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 public class VillagerBedFix extends JavaPlugin implements Listener {
+
+    private Set<Villager> teleportedVillagers = new HashSet<>(); // Set to track villagers who already went to bed
+    private final long TELEPORT_INTERVAL = 100L; // Check interval: 100 ticks = 5 seconds
 
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("VillagerBedFix enabled for Minecraft 1.21.4!");
+
+        // Check every 5 seconds
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                checkVillagersForBed();
+            }
+        }.runTaskTimer(this, 0L, TELEPORT_INTERVAL); // Start checking after 0 ticks, repeat every 100 ticks (5 seconds)
     }
 
     @Override
     public void onDisable() {
         getLogger().info("VillagerBedFix disabled!");
+    }
+
+    private void checkVillagersForBed() {
+        for (Villager villager : Bukkit.getWorlds().get(0).getEntitiesByClass(Villager.class)) {
+            if (isNight() && !teleportedVillagers.contains(villager)) { // If it's night and the villager hasn't gone to
+                                                                        // bed
+                Location villagerLocation = villager.getLocation();
+
+                Optional<Block> nearestBed = findNearestBed(villagerLocation);
+
+                if (nearestBed.isPresent() && !isBedOccupied(nearestBed.get()) && !isVillagerSleeping(villager)) {
+                    teleportVillagerToBed(villager, nearestBed.get());
+                    teleportedVillagers.add(villager); // Add the villager to the set of those who have already gone to
+                                                       // bed
+                }
+            }
+        }
+    }
+
+    private boolean isVillagerSleeping(Villager villager) {
+        return villager.isSleeping(); // Check if the villager is sleeping
+    }
+
+    private void teleportVillagerToBed(Villager villager, Block bedBlock) {
+        Location bedLocation = bedBlock.getLocation().add(0.5, 0.5, 0.5);
+        villager.teleport(bedLocation);
+        // No logging here
     }
 
     @EventHandler
@@ -35,34 +76,32 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
         Villager villager = (Villager) event.getEntity();
         Location villagerLocation = villager.getLocation();
 
-        // Перевірка, чи зараз ніч у грі
+        // If it's daytime, do not teleport
         if (!isNight()) {
-            return; // Якщо день, не телепортуємо
+            return; // If it's daytime, don't teleport
         }
 
-        // Знайдемо найближче ліжко
         Optional<Block> nearestBed = findNearestBed(villagerLocation);
 
-        // Якщо ліжко не знайдено або воно не є ліжком підтримуваного кольору
         if (nearestBed.isPresent() && !isBedMaterial(nearestBed.get())) {
-            return; // Ліжко було знищене або змінено
+            return; // The bed was destroyed or changed
         }
 
-        // Перевірка, чи ліжко зайняте
+        // Check if the bed is occupied
         if (isBedOccupied(nearestBed.get())) {
-            return; // Ліжко вже зайняте, не телепортуємо
+            return; // The bed is occupied, don't teleport
         }
 
-        // Якщо мешканець вже біля ліжка, не телепортуємо
+        // If the villager is already near the bed, do nothing
         if (nearestBed.isPresent() && villagerLocation.distanceSquared(nearestBed.get().getLocation()) < 2) {
-            return; // Мешканець вже біля ліжка, не робимо нічого
+            return; // The villager is already near the bed, do nothing
         }
 
-        // Телепортуємо мешканця на ліжко
+        // Teleport the villager to the bed
         nearestBed.ifPresent(bedBlock -> {
             Location bedLocation = bedBlock.getLocation().add(0.5, 0.5, 0.5);
             villager.teleport(bedLocation);
-            getLogger().info("Teleported villager to bed at " + bedLocation);
+            // No logging here
         });
     }
 
@@ -71,13 +110,15 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
         Block nearestBed = null;
         double shortestDistance = radius * radius;
 
+        // Loop through a 5x5x5 area around the villager's location to find the nearest
+        // bed
         for (int x = -5; x <= 5; x++) {
             for (int y = -5; y <= 5; y++) {
                 for (int z = -5; z <= 5; z++) {
                     Location checkLocation = location.clone().add(x, y, z);
                     Block block = checkLocation.getBlock();
 
-                    // Перевірка на ліжко будь-якого кольору
+                    // Check if the block is a bed of any color
                     if (isBedMaterial(block)) {
                         double distance = block.getLocation().distanceSquared(location);
                         if (distance < shortestDistance) {
@@ -91,27 +132,27 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
         return Optional.ofNullable(nearestBed);
     }
 
-    // Перевірка на ліжко будь-якого кольору
+    // Check if the block is a bed of any color
     private boolean isBedMaterial(Block block) {
         return block.getType().name().endsWith("_BED");
     }
 
-    // Перевірка, чи ліжко зайняте
+    // Check if the bed is occupied
     private boolean isBedOccupied(Block bedBlock) {
         if (bedBlock == null)
             return false;
 
         Bed bedData = (Bed) bedBlock.getBlockData();
         return bedData.getPart() == Bed.Part.HEAD && bedBlock.getWorld().getEntities().stream()
-                .anyMatch(entity -> entity.getLocation().distanceSquared(bedBlock.getLocation()) < 2); // Перевіряємо,
-                                                                                                       // чи є гравець
-                                                                                                       // або мешканець
-                                                                                                       // біля ліжка
+                .anyMatch(entity -> entity.getLocation().distanceSquared(bedBlock.getLocation()) < 2); // Check if there
+                                                                                                       // is a player or
+                                                                                                       // villager near
+                                                                                                       // the bed
     }
 
-    // Перевірка, чи зараз ніч у грі
+    // Check if it's night in the game
     private boolean isNight() {
         long time = Bukkit.getWorlds().get(0).getTime();
-        return time >= 13000 && time <= 23000; // Час для ночі в Minecraft (13000 - 23000)
+        return time >= 13000 && time <= 23000; // Night time in Minecraft (13000 - 23000)
     }
 }
