@@ -13,11 +13,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class VillagerBedFix extends JavaPlugin {
 
     private final Map<Villager, Long> lastTeleportTime = new HashMap<>();
+    private final Set<Block> occupiedBeds = new HashSet<>();
     private static final long TELEPORT_COOLDOWN = 5000; // 5 seconds in milliseconds
 
     @Override
@@ -62,6 +65,7 @@ public class VillagerBedFix extends JavaPlugin {
         Block bedBlock = getClaimedBed(villager);
         if (bedBlock != null) {
             if (isBedUsable(bedBlock)) {
+                occupyBed(bedBlock);
                 teleportVillagerToBed(villager, bedBlock);
                 lastTeleportTime.put(villager, currentTime);
                 return;
@@ -71,6 +75,7 @@ public class VillagerBedFix extends JavaPlugin {
         // Look for an unclaimed bed nearby
         Block unclaimedBed = findUnclaimedBedNearby(villager.getLocation());
         if (unclaimedBed != null) {
+            occupyBed(unclaimedBed);
             teleportVillagerToBed(villager, unclaimedBed);
             lastTeleportTime.put(villager, currentTime);
         }
@@ -117,6 +122,11 @@ public class VillagerBedFix extends JavaPlugin {
             return false;
         }
 
+        // Check if the bed is already occupied
+        if (occupiedBeds.contains(block)) {
+            return false;
+        }
+
         // Ensure no entities are already on the bed
         Location bedLocation = block.getLocation();
         for (Entity entity : bedLocation.getWorld().getNearbyEntities(bedLocation, 1, 1, 1)) {
@@ -126,6 +136,17 @@ public class VillagerBedFix extends JavaPlugin {
         }
 
         return true;
+    }
+
+    private void occupyBed(Block bedBlock) {
+        occupiedBeds.add(bedBlock);
+        // Schedule a task to release the bed when no longer needed
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                occupiedBeds.remove(bedBlock);
+            }
+        }.runTaskLater(this, 20 * 10); // Release after 10 seconds
     }
 
     private void teleportVillagerToBed(Villager villager, Block bedBlock) {
