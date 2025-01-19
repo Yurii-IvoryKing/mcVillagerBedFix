@@ -35,10 +35,15 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
         Villager villager = (Villager) event.getEntity();
         Location villagerLocation = villager.getLocation();
 
-        // Find the nearest usable bed in a 5-block radius
+        // Перевірка, чи зараз ніч у грі
+        if (!isNight()) {
+            return; // Якщо день, не телепортуємо
+        }
+
+        // Знайдемо найближче ліжко
         Optional<Block> nearestBed = findNearestBed(villagerLocation);
 
-        // Якщо ліжко не знайдено або ліжко не є одним з підтримуваних кольорів
+        // Якщо ліжко не знайдено або воно не є ліжком підтримуваного кольору
         if (nearestBed.isPresent() && !isBedMaterial(nearestBed.get())) {
             return; // Ліжко було знищене або змінено
         }
@@ -84,5 +89,11 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
     // Перевірка на ліжко будь-якого кольору
     private boolean isBedMaterial(Block block) {
         return block.getType().name().endsWith("_BED");
+    }
+
+    // Перевірка, чи зараз ніч у грі
+    private boolean isNight() {
+        long time = Bukkit.getWorlds().get(0).getTime();
+        return time >= 13000 && time <= 23000; // Час для ночі в Minecraft (13000 - 23000)
     }
 }
