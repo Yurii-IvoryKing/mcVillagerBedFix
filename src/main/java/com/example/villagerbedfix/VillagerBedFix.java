@@ -48,6 +48,11 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
             return; // Ліжко було знищене або змінено
         }
 
+        // Перевірка, чи ліжко зайняте
+        if (isBedOccupied(nearestBed.get())) {
+            return; // Ліжко вже зайняте, не телепортуємо
+        }
+
         // Якщо мешканець вже біля ліжка, не телепортуємо
         if (nearestBed.isPresent() && villagerLocation.distanceSquared(nearestBed.get().getLocation()) < 2) {
             return; // Мешканець вже біля ліжка, не робимо нічого
@@ -89,6 +94,19 @@ public class VillagerBedFix extends JavaPlugin implements Listener {
     // Перевірка на ліжко будь-якого кольору
     private boolean isBedMaterial(Block block) {
         return block.getType().name().endsWith("_BED");
+    }
+
+    // Перевірка, чи ліжко зайняте
+    private boolean isBedOccupied(Block bedBlock) {
+        if (bedBlock == null)
+            return false;
+
+        Bed bedData = (Bed) bedBlock.getBlockData();
+        return bedData.getPart() == Bed.Part.HEAD && bedBlock.getWorld().getEntities().stream()
+                .anyMatch(entity -> entity.getLocation().distanceSquared(bedBlock.getLocation()) < 2); // Перевіряємо,
+                                                                                                       // чи є гравець
+                                                                                                       // або мешканець
+                                                                                                       // біля ліжка
     }
 
     // Перевірка, чи зараз ніч у грі
