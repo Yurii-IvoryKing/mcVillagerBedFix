@@ -10,7 +10,7 @@
 
 ###
 
-<p align="left">When villagers come close to bed, he  <br>eventually teleports on his claimed bed.</p>
+<p align="left">When villager come close to bed, he as usually ignore doors, but eventually teleports on his claimed bed.</p>
 <p align="left">Better villagers AI</p>
 
 ###
