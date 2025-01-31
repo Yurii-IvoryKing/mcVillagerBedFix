@@ -2,7 +2,7 @@
 
 ###
 
-<p align="left">Villagers always stuck in walls? <br>If you're using Minecraft 1.21.4 PaperMC server you can use this plugin to fix it!</p>
+<p align="left">Villagers always stuck in walls? <br>If you're using Minecraft 1.21.4 PaperMC/Bukkit/Spigot server you can use this plugin to fix it!</p>
 
 ###
 
