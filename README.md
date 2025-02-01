@@ -1,4 +1,4 @@
-<h1 align="left">VillagerBedFix</h1>
+<h1 align="left">Minecraft Villager Bed Fix</h1>
 
 ###
 
