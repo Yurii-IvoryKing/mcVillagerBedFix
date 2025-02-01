@@ -2,17 +2,13 @@ package com.example.villagerbedfix;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Villager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.block.BlockFace;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,7 +21,7 @@ public class VillagerBedFix extends JavaPlugin {
     private final Map<Villager, Long> lastTeleportTime = new HashMap<>();
     private final Set<Block> occupiedBeds = new HashSet<>();
     private static final long TELEPORT_COOLDOWN = 5000;
-    private static final int BED_SEARCH_RADIUS = 20;
+    private static final int BED_SEARCH_RADIUS = 5;
 
     @Override
     public void onEnable() {
