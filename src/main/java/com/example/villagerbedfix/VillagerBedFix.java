@@ -5,12 +5,14 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Villager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.block.BlockFace;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,9 +21,11 @@ import java.util.Set;
 
 public class VillagerBedFix extends JavaPlugin {
 
+    private final Map<Villager, Block> villagerBeds = new HashMap<>();
     private final Map<Villager, Long> lastTeleportTime = new HashMap<>();
     private final Set<Block> occupiedBeds = new HashSet<>();
-    private static final long TELEPORT_COOLDOWN = 5000; // 5 seconds in milliseconds
+    private static final long TELEPORT_COOLDOWN = 5000;
+    private static final int BED_SEARCH_RADIUS = 20;
 
     @Override
     public void onEnable() {
@@ -31,8 +35,7 @@ public class VillagerBedFix extends JavaPlugin {
             public void run() {
                 for (World world : Bukkit.getWorlds()) {
                     if (!isNight(world))
-                        continue; // Only process at night
-
+                        continue;
                     for (Entity entity : world.getEntitiesByClass(Villager.class)) {
                         if (entity instanceof Villager villager) {
                             tryTeleportToBed(villager);
@@ -40,7 +43,7 @@ public class VillagerBedFix extends JavaPlugin {
                     }
                 }
             }
-        }.runTaskTimer(this, 0, 20); // Runs every second (20 ticks)
+        }.runTaskTimer(this, 0, 20);
     }
 
     private boolean isNight(World world) {
@@ -49,7 +52,6 @@ public class VillagerBedFix extends JavaPlugin {
     }
 
     private void tryTeleportToBed(Villager villager) {
-        // Ensure cooldown is respected
         long currentTime = System.currentTimeMillis();
         if (lastTeleportTime.containsKey(villager)
                 && currentTime - lastTeleportTime.get(villager) < TELEPORT_COOLDOWN) {
@@ -57,100 +59,118 @@ public class VillagerBedFix extends JavaPlugin {
         }
 
         // If the villager is already sleeping, skip
-        if (villager.isSleeping()) {
+        if (villager.isSleeping())
             return;
-        }
 
         // Check for the villager's claimed bed
-        Block bedBlock = getClaimedBed(villager);
-        if (bedBlock != null) {
-            if (isBedUsable(bedBlock)) {
-                occupyBed(bedBlock);
-                teleportVillagerToBed(villager, bedBlock);
+        Block claimedBed = getClaimedBed(villager);
+        if (claimedBed != null) {
+            // If the bed is usable, teleport the villager to it
+            if (isBedUsable(claimedBed, villager)) {
+                occupyBed(claimedBed, villager);
+                teleportVillagerToBed(villager, claimedBed);
                 lastTeleportTime.put(villager, currentTime);
                 return;
             }
         }
 
-        // Look for an unclaimed bed nearby
-        Block unclaimedBed = findUnclaimedBedNearby(villager.getLocation());
-        if (unclaimedBed != null) {
-            occupyBed(unclaimedBed);
-            teleportVillagerToBed(villager, unclaimedBed);
-            lastTeleportTime.put(villager, currentTime);
+        // If no claimed bed is found, search for the nearest unclaimed bed
+        Block newBed = findNearestBed(villager.getLocation());
+        if (newBed != null) {
+            villagerBeds.put(villager, newBed);
+            if (isBedUsable(newBed, villager)) {
+                occupyBed(newBed, villager);
+                teleportVillagerToBed(villager, newBed);
+                lastTeleportTime.put(villager, currentTime);
+            }
         }
     }
 
+    // Retrieves the bed claimed by the villager
     private Block getClaimedBed(Villager villager) {
-        // Placeholder logic to retrieve the villager's claimed bed
-        // Villager AI usually assigns a bed, but you can customize this if necessary
-        // Here, we'll assume no direct API and leave this unimplemented.
-        return null;
+        // Check if the villager already has a bed assigned
+        Block rememberedBed = villagerBeds.get(villager);
+        if (rememberedBed != null && isBedBlock(rememberedBed)) {
+            return rememberedBed;
+        }
+        return findNearestBed(villager.getLocation());
     }
 
-    private Block findUnclaimedBedNearby(Location location) {
-        int radius = 5;
+    // Finds the nearest bed within the search radius
+    private Block findNearestBed(Location location) {
         World world = location.getWorld();
         if (world == null)
             return null;
 
-        for (int x = -radius; x <= radius; x++) {
-            for (int y = -radius; y <= radius; y++) {
-                for (int z = -radius; z <= radius; z++) {
+        Block nearestBed = null;
+        double nearestDistance = Double.MAX_VALUE;
+
+        for (int x = -BED_SEARCH_RADIUS; x <= BED_SEARCH_RADIUS; x++) {
+            for (int y = -BED_SEARCH_RADIUS; y <= BED_SEARCH_RADIUS; y++) {
+                for (int z = -BED_SEARCH_RADIUS; z <= BED_SEARCH_RADIUS; z++) {
                     Block block = world.getBlockAt(location.clone().add(x, y, z));
-                    if (isBedBlock(block) && isBedUsable(block)) {
-                        return block;
+                    if (isBedBlock(block)) {
+                        double distance = block.getLocation().distanceSquared(location);
+                        if (distance < nearestDistance) {
+                            nearestBed = block;
+                            nearestDistance = distance;
+                        }
                     }
                 }
             }
         }
-        return null;
+        return nearestBed;
     }
 
     private boolean isBedBlock(Block block) {
-        Material type = block.getType();
-        return type == Material.WHITE_BED || type == Material.ORANGE_BED || type == Material.MAGENTA_BED ||
-                type == Material.LIGHT_BLUE_BED || type == Material.YELLOW_BED || type == Material.LIME_BED ||
-                type == Material.PINK_BED || type == Material.GRAY_BED || type == Material.LIGHT_GRAY_BED ||
-                type == Material.CYAN_BED || type == Material.PURPLE_BED || type == Material.BLUE_BED ||
-                type == Material.BROWN_BED || type == Material.GREEN_BED || type == Material.RED_BED ||
-                type == Material.BLACK_BED;
+        return block.getBlockData() instanceof Bed;
     }
 
-    private boolean isBedUsable(Block block) {
-        if (!(block.getBlockData() instanceof Bed)) {
+    private boolean isBedUsable(Block block, Villager owner) {
+        Bed bedData = (Bed) block.getBlockData();
+        Block partnerBlock = block.getRelative(bedData.getPart() == Bed.Part.HEAD
+                ? bedData.getFacing().getOppositeFace()
+                : bedData.getFacing());
+
+        if (occupiedBeds.contains(block) || occupiedBeds.contains(partnerBlock)) {
             return false;
         }
 
-        // Check if the bed is already occupied
-        if (occupiedBeds.contains(block)) {
-            return false;
-        }
-
-        // Ensure no entities are already on the bed
-        Location bedLocation = block.getLocation();
-        for (Entity entity : bedLocation.getWorld().getNearbyEntities(bedLocation, 1, 1, 1)) {
-            if (entity instanceof LivingEntity livingEntity && livingEntity.isSleeping()) {
-                return false;
-            }
-        }
-
-        return true;
+        Location bedLoc = block.getLocation().add(0.5, 0.5, 0.5);
+        return bedLoc.getNearbyEntities(1.5, 1.5, 1.5).stream()
+                .noneMatch(e -> e instanceof Villager && e != owner);
     }
 
-    private void occupyBed(Block bedBlock) {
+    // Marks a bed as occupied
+    private void occupyBed(Block bedBlock, Villager villager) {
+        Bed bedData = (Bed) bedBlock.getBlockData();
+        Block secondPart = bedBlock.getRelative(bedData.getPart() == Bed.Part.HEAD
+                ? bedData.getFacing().getOppositeFace()
+                : bedData.getFacing());
+
         occupiedBeds.add(bedBlock);
-        // Schedule a task to release the bed when no longer needed
+        occupiedBeds.add(secondPart);
+
         new BukkitRunnable() {
             @Override
             public void run() {
                 occupiedBeds.remove(bedBlock);
+                occupiedBeds.remove(secondPart);
             }
         }.runTaskLater(this, 20 * 10); // Release after 10 seconds
     }
 
+    // Teleports the villager to the bed
     private void teleportVillagerToBed(Villager villager, Block bedBlock) {
-        Location bedLocation = bedBlock.getLocation().add(0.5, 0.5, 0.5); // Center the villager on the bed
+        Location bedLocation = bedBlock.getLocation().add(0.5, 0.1, 0.5);
+        bedLocation.setYaw(180); // Face the villager south (or adjust as needed)
         villager.teleport(bedLocation);
+    }
+
+    @Override
+    public void onDisable() {
+        villagerBeds.clear();
+        occupiedBeds.clear();
+        lastTeleportTime.clear();
     }
 }
